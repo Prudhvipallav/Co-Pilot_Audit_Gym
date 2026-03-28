@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────
+# OpenEnv-GovernanceReview — Model Configuration
+# ─────────────────────────────────────────────────────────────────
+#
+# REVIEWER:     Qwen2.5-0.5B-Instruct — runs LOCALLY via transformers
+#               One-time ~1GB download. No API key needed.
+#
+# PROBLEM MAKER: API-based (small/cheap model — OpenAI or Anthropic)
+#
+# JUDGE:        API-based (high-capability model for nuanced evaluation)
+#
+# Supported providers: local | openai | anthropic | huggingface | ollama
+# ─────────────────────────────────────────────────────────────────
+
+reviewer:
+  provider: local
+  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  max_new_tokens: 512
+  temperature: 0.1          # Low = consistent, deterministic reviews
+  # No API key needed — runs on CPU via transformers
+
+problem_maker:
+  provider: openai
+  model_id: gpt-4o-mini
+  max_tokens: 2048
+  temperature: 0.7          # Higher = more creative/varied scenarios
+  api_key_env: OPENAI_API_KEY
+  # Alternatives:
+  # provider: anthropic / model_id: claude-haiku-4-5-20251001 / api_key_env: ANTHROPIC_API_KEY
+  # provider: huggingface / model_id: microsoft/Phi-3-mini-4k-instruct / api_key_env: HF_TOKEN
+  # provider: ollama / model_id: qwen2.5:0.5b
+
+judge:
+  provider: openai
+  model_id: gpt-4o
+  max_tokens: 1024
+  temperature: 0.1
+  api_key_env: OPENAI_API_KEY
+  # Alternatives:
+  # provider: anthropic / model_id: claude-sonnet-4-6 / api_key_env: ANTHROPIC_API_KEY
+  # provider: openai / model_id: gpt-4o-mini  (cheaper, slightly less nuanced)
