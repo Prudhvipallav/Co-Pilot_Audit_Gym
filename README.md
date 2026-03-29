@@ -14,7 +14,7 @@ tags:
   - governance
   - compliance
   - multi-agent
-short_description: Multi-agent RL environment for enterprise AI governance review
+short_description: RL env for auditing enterprise AI copilots
 ---
 
 # 🏛️ CopilotAudit-Gym PRO v3.1
