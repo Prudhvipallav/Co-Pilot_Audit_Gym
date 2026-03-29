@@ -5,7 +5,7 @@ Endpoints: /generate_task, /mutate_task, /adversarial_task, /judge, /curriculum
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from typing import Optional
 import json, os, sys
 
@@ -30,7 +30,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 env = GovernanceReviewEnv(task_id=1)
 _last_generated_task: Optional[GeneratedTask] = None
