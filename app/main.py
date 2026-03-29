@@ -31,13 +31,6 @@ env = GovernanceReviewEnv(task_id=1)
 _last_generated_task: Optional[GeneratedTask] = None
 
 
-# ─── Root redirect to Gradio UI ───────────────────────────────────
-from fastapi.responses import RedirectResponse
-
-@app.get("/", include_in_schema=False)
-def root_redirect():
-    """Redirect root to the Gradio dashboard. All API endpoints are unaffected."""
-    return RedirectResponse(url="/ui")
 
 
 
@@ -441,7 +434,7 @@ try:
     import gradio as _gr
     from app_ui import create_app as _create_gradio_app
     _demo = _create_gradio_app()
-    app = _gr.mount_gradio_app(app, _demo, path="/ui")
-    print("[Dashboard] ✅ Gradio dashboard mounted at /ui")
+    app = _gr.mount_gradio_app(app, _demo, path="/")
+    print("[Dashboard] ✅ Gradio dashboard mounted at /")
 except Exception as _e:
     print(f"[Dashboard] ⚠️  Gradio not mounted (evaluation unaffected): {_e}")
