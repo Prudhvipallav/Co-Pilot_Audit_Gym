@@ -950,13 +950,13 @@ This is the same mechanism behind AlphaGo's self-play. Both sides co-evolve.
 | Code | What It Means | Look For... |
 |---|---|---|
 | `PII-001` | PII in logs | SSN, email, names in logging/telemetry configs |
-| `RETAIN-002` | Retention > 90 days | Retention periods exceeding the limit |
-| `AUDIT-007` | Missing audit trail | Gaps in logging coverage |
-| `TRAINING-006` | Bad training data | Unlicensed or biased datasets |
-| `HUMAN-003` | No human escalation | Missing human-in-the-loop |
+| `ACCESS-002` | Missing access controls | Incomplete role-based access controls |
+| `ESCALATION-003` | No human escalation | Missing human-in-the-loop; pending/TBD plans |
 | `DOMAIN-004` | No domain expert sign-off | Missing specialist validation |
-| `ENCRYPT-005` | Missing encryption | No encryption at rest/transit |
-| `BIAS-008` | No fairness testing | Missing bias evaluation |
+| `RETENTION-005` | Retention > 90 days | Retention periods exceeding the limit |
+| `TRAINING-006` | Bad training data | Unlicensed or biased datasets |
+| `AUDIT-007` | Missing audit trail | Gaps in logging coverage |
+| `EVAL-008` | Insufficient evaluation | Missing fairness or testing coverage |
 
 ---
 

@@ -117,29 +117,110 @@ def run_inference_episode(task_id: int, client: OpenAI):
     print(f"Final Score: {score_data['scores']['overall']:.4f} ({score_data['grade']})")
     return score_data['scores']['overall']
 
-def main():
-    if not API_KEY:
-        print("❌ Error: HF_TOKEN or API_KEY environment variable not set.")
-        return
+def run_rule_based_episode(task_id: int):
+    """Fallback: deterministic rule-based agent when no API key available."""
+    resp = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id})
+    resp.raise_for_status()
+    obs = resp.json()["observation"]
+    print(f"\n--- [Rule-Based] Task {task_id}: {obs['feature_name']} ---")
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-    
+    total_reward = 0.0
+
+    # Step 1: Inspect all artifacts
+    for art_name in list(obs.get("visible_artifacts", {}).keys()):
+        r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
+            "action_type": "inspect_artifact", "target": art_name
+        })}).json()
+        total_reward += r["reward"]
+        obs = r["observation"]
+        if r["done"]:
+            break
+
+    # Step 2: Flag based on observation hints
+    msg = obs.get("message", "").lower()
+    known_flags = [
+        ("PII-001", "critical"), ("ACCESS-002", "high"),
+        ("ESCALATION-003", "high"), ("DOMAIN-004", "critical"),
+        ("RETENTION-005", "medium"), ("TRAINING-006", "critical"),
+        ("AUDIT-007", "medium"), ("EVAL-008", "high"),
+    ]
+    for code, sev in known_flags:
+        if code.lower().replace("-", "") in msg.replace("-", "").replace("_", "").lower() or \
+           code.split("-")[0].lower() in msg:
+            r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
+                "action_type": "flag_issue", "issue_code": code,
+                "severity": sev, "target": "product_spec.md",
+                "note": f"Auto-detected {code}"
+            })}).json()
+            total_reward += r["reward"]
+            obs = r["observation"]
+            if r["done"]:
+                break
+
+            # Request mitigation
+            r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
+                "action_type": "request_mitigation", "issue_code": code,
+                "note": f"Remediate {code}"
+            })}).json()
+            total_reward += r["reward"]
+            obs = r["observation"]
+            if r["done"]:
+                break
+
+    # Step 3: Set risk and decide
+    if not obs.get("done", False):
+        r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
+            "action_type": "set_risk", "severity": "high"
+        })}).json()
+        total_reward += r["reward"]
+        obs = r["observation"]
+
+    if not r.get("done", False):
+        r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
+            "action_type": "reject"
+        })}).json()
+        total_reward += r["reward"]
+
+    grader_resp = requests.get(f"{ENV_URL}/grader")
+    score_data = grader_resp.json()
+    print(f"Final Score: {score_data['scores']['overall']:.4f} ({score_data['grade']})")
+    return score_data['scores']['overall']
+
+
+def main():
     # Check server
     try:
-        requests.get(f"{ENV_URL}/health")
-    except:
+        requests.get(f"{ENV_URL}/health", timeout=5)
+    except Exception:
         print(f"❌ Error: Environment not running at {ENV_URL}")
         print("Please start the server first: uvicorn app.main:app --port 8000")
         return
 
+    # Determine agent mode
+    use_llm = bool(API_KEY)
+    if use_llm:
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        print(f"🤖 Using LLM agent: {MODEL_NAME}")
+    else:
+        client = None
+        print("⚠️  No API key found (HF_TOKEN/API_KEY). Using rule-based fallback agent.")
+
     scores = []
     for task_id in [1, 2, 3]:
-        score = run_inference_episode(task_id, client)
-        scores.append(score)
-        
+        try:
+            if use_llm:
+                score = run_inference_episode(task_id, client)
+            else:
+                score = run_rule_based_episode(task_id)
+            scores.append(score)
+        except Exception as e:
+            print(f"❌ Task {task_id} failed: {e}")
+            scores.append(0.0)
+
     avg_score = sum(scores) / len(scores)
     print(f"\n==========================================")
     print(f"BASELINE SUMMARY: Average Score = {avg_score:.4f}")
+    print(f"Agent: {'LLM (' + MODEL_NAME + ')' if use_llm else 'Rule-Based Fallback'}")
     print(f"==========================================")
 
 if __name__ == "__main__":

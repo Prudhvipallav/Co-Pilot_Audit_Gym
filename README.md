@@ -501,16 +501,17 @@ print(f"Grade: {score['grade']}, Safety: {score['safety']}")
 
 ### Policy Violation Codes Reference
 
-| Code | Rule | What to Look For |
-|---|---|---|
-| `PII-001` | No PII in Logs | Personal data (SSN, email, name) in logging or telemetry configs |
-| `RETAIN-002` | Data Retention ≤ 90 Days | Retention policies exceeding 90-day limit |
-| `AUDIT-007` | Complete Audit Trail | Missing audit logging, incomplete trace coverage |
-| `TRAINING-006` | Training Data Compliance | Using unlicensed, biased, or non-consented training data |
-| `HUMAN-003` | Human Escalation Required | No human-in-the-loop for high-stakes decisions |
-| `DOMAIN-004` | Domain Expert Validation | No domain-specific expert sign-off for specialized domains |
-| `ENCRYPT-005` | Data Encryption Standards | Missing encryption at rest or in transit |
-| `BIAS-008` | Bias and Fairness Testing | No fairness evaluation or disparate impact testing |
+| Code | Rule | Severity | What to Look For |
+|---|---|---|---|
+| `PII-001` | No PII in Logs | Critical | Personal data (SSN, email, name) in logging or telemetry configs; planned/TBD filters |
+| `ACCESS-002` | Access Controls Required | High | Missing or incomplete role-based access controls |
+| `ESCALATION-003` | Human Escalation Required | High | No human-in-the-loop for high-stakes decisions; pending/TBD escalation plans |
+| `DOMAIN-004` | Domain Expert Validation | Critical | No domain-specific expert sign-off; prohibited domains like investment allocation |
+| `RETENTION-005` | Data Retention ≤ 90 Days | Medium | Retention policies exceeding 90-day limit |
+| `TRAINING-006` | Training Data Compliance | Critical | Using unlicensed, biased, or non-consented training data |
+| `AUDIT-007` | Complete Audit Trail | Medium | Missing audit logging, incomplete trace coverage |
+| `EVAL-008` | Sufficient Evaluation | High | No fairness evaluation, insufficient testing coverage |
+
 
 
 ## License
