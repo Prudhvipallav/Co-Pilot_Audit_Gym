@@ -18,7 +18,7 @@ def validate_score_range(score: Dict[str, float]) -> bool:
                      "mitigation_quality", "overall"}
     if not required_keys.issubset(score.keys()):
         return False
-    return all(0.0 <= v <= 1.0 for v in score.values())
+    return all(0.0 <= v <= 1.0 for v in score.values() if isinstance(v, (int, float)))
 
 
 def score_to_grade(overall: float) -> str:

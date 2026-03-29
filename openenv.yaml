@@ -1,0 +1,41 @@
+name: CopilotAudit-Gym
+version: "3.0.0"
+description: "A simulator for training AI agents in Enterprise AI Governance and Risk Review."
+entry_point: app.main:app
+sdk: docker
+python_version: "3.11"
+app_port: 7860
+
+tasks:
+  - id: 1
+    name: CustomerCare AI Copilot
+    difficulty: easy
+    description: "Identify a single critical SSN logging violation in a customer support tool."
+  - id: 2
+    name: HRAdvisor AI
+    difficulty: medium
+    description: "Navigate multiple documents to find data retention and escalation plan violations."
+  - id: 3
+    name: WealthWise Financial Copilot
+    difficulty: hard
+    description: "Uncover hidden adversarial violations requiring deep cross-referencing of specs."
+
+action_space:
+  type: dict
+  description: "JSON action containing action_type (inspect_artifact, flag_issue, etc.) and metadata."
+  schema:
+    action_type: "Literal['inspect_artifact', 'flag_issue', 'request_mitigation', 'set_risk', 'approve', 'reject', 'escalate']"
+    target: "Optional[str] (e.g., 'logging_policy.yaml')"
+    issue_code: "Optional[str] (e.g., 'PII-001')"
+    severity: "Optional[str] (low, medium, high, critical)"
+    note: "Optional[str]"
+
+observation_space:
+  type: dict
+  description: "Comprehensive environment state including artifact list, inspected content, and review progress."
+
+tags:
+  - openenv
+  - ai-governance
+  - grc
+  - rl-training

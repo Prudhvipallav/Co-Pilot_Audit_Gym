@@ -189,7 +189,6 @@ class TestPolicyChecks:
 class TestAPIEndpoints:
     """Integration tests that require the server to be running."""
 
-    @pytest.mark.skip(reason="Requires running server")
     def test_reset_endpoint(self):
         import requests
         resp = requests.post("http://localhost:8000/reset", json={"task_id": 1})
@@ -197,7 +196,6 @@ class TestAPIEndpoints:
         data = resp.json()
         assert "observation" in data
 
-    @pytest.mark.skip(reason="Requires running server")
     def test_tasks_endpoint(self):
         import requests
         resp = requests.get("http://localhost:8000/tasks")
@@ -205,7 +203,6 @@ class TestAPIEndpoints:
         data = resp.json()
         assert len(data["tasks"]) == 3
 
-    @pytest.mark.skip(reason="Requires running server")
     def test_baseline_endpoint(self):
         import requests
         resp = requests.post("http://localhost:8000/baseline")

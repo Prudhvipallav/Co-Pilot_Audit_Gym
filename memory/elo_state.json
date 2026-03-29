@@ -1,0 +1,12 @@
+{
+  "elo": 1025.9,
+  "round_history": [
+    {
+      "elo_before": 1000.0,
+      "elo_after": 1025.9,
+      "score": 1.0,
+      "task_id": 2,
+      "won": true
+    }
+  ]
+}

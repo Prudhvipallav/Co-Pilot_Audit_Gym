@@ -10,7 +10,7 @@ Bug fixes (v2):
   env.py [P1]:    post-terminal step() guard added separately in env.py
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from dataclasses import dataclass
 import re
 
@@ -22,6 +22,52 @@ class PolicyRule:
     description: str
     severity: str  # low | medium | high | critical
     artifact_hint: str = ""
+
+
+@dataclass
+class SectorConfig:
+    name: str
+    description: str
+    critical_codes: List[str]
+    high_codes: List[str]
+    persona_name: str
+    persona_style: str
+
+
+SECTOR_CONFIGS = {
+    "finance": SectorConfig(
+        name="FinTech & Banking",
+        description="High-stakes financial services with strict SSN and Fraud controls.",
+        critical_codes=["PII-001", "DOMAIN-004", "ACCESS-002"],
+        high_codes=["AUDIT-007", "ESCALATION-003"],
+        persona_name="The High-Stakes Regulator",
+        persona_style="Strict, precise, and highly sensitive to financial liability and SSN exposure."
+    ),
+    "healthcare": SectorConfig(
+        name="Healthcare & Life Sciences",
+        description="Patient privacy focused environment (HIPAA alignment).",
+        critical_codes=["PII-001", "DOMAIN-004", "TRAINING-006"],
+        high_codes=["ACCESS-002", "ESCALATION-003"],
+        persona_name="The Privacy Advocate",
+        persona_style="Extremely cautious about PHI/PII and unauthorized medical advice."
+    ),
+    "retail": SectorConfig(
+        name="Retail & E-Commerce",
+        description="Customer-centric environment focusing on consent and data retention.",
+        critical_codes=["PII-001", "RETENTION-005"],
+        high_codes=["ACCESS-002", "AUDIT-007"],
+        persona_name="The Customer Success Guard",
+        persona_style="Focused on transparency, data lifecycle, and customer trust."
+    ),
+    "tech": SectorConfig(
+        name="Big Tech & R&D",
+        description="Fast-moving innovation with focus on IP and audit trails.",
+        critical_codes=["TRAINING-006", "AUDIT-007", "PII-001"],
+        high_codes=["EVAL-008", "ACCESS-002"],
+        persona_name="The Agile Compliance Lead",
+        persona_style="Efficient, tech-savvy, and focused on automated safety controls and IP protection."
+    )
+}
 
 
 POLICY_RULES = [
@@ -85,6 +131,42 @@ POLICY_RULES = [
 
 # Map codes to rule objects for quick lookup
 POLICY_RULE_MAP = {r.code: r for r in POLICY_RULES}
+
+# ═══════════════════════════════════════════════════════════════
+#  CAUSAL VIOLATION GRAPH
+#  Encodes real-world causal relationships between policy violations.
+#  e.g. if PII is logged (PII-001), it's likely retained too long (RETENTION-005)
+#  and the external model provider may train on it (TRAINING-006).
+# ═══════════════════════════════════════════════════════════════
+
+VIOLATION_CAUSES: dict = {
+    "PII-001":        ["RETENTION-005", "TRAINING-006"],   # Log PII → retain it → train on it
+    "TRAINING-006":   ["AUDIT-007"],                       # Train on data → need audit trail
+    "DOMAIN-004":     ["ESCALATION-003"],                  # Prohibited domain → must escalate
+    "ACCESS-002":     ["AUDIT-007"],                       # Privileged access → needs auditing
+    "RETENTION-005":  ["TRAINING-006"],                    # Long retention → training risk
+    "ESCALATION-003": ["DOMAIN-004"],                      # Missing escalation → domain risk
+}
+
+
+def get_causal_hints(flagged_codes: list) -> list:
+    """
+    Given a list of already-flagged violation codes, return hints about
+    other violations that are causally likely to be present.
+
+    Returns list of hint strings like:
+      "Flagging PII-001 suggests also checking RETENTION-005 and TRAINING-006"
+    """
+    hints = []
+    for code in flagged_codes:
+        caused = VIOLATION_CAUSES.get(code, [])
+        unflagged = [c for c in caused if c not in flagged_codes]
+        if unflagged:
+            rule_names = [f"{c} ({POLICY_RULE_MAP[c].name})" for c in unflagged if c in POLICY_RULE_MAP]
+            if rule_names:
+                hints.append(f"⚠️ {code} often causes: {', '.join(rule_names)} — check these too.")
+    return hints
+
 
 
 def _negation_context(text: str, keyword: str, window: int = 6) -> bool:

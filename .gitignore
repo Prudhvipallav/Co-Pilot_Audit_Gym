@@ -1,0 +1,31 @@
+# Development files (not for hackathon submission)
+_dev/
+hf_deploy/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs & artifacts
+*.log
+results_*.json
+
+# Model checkpoints (large)
+checkpoints/
+model_final.zip
+
+# Env & secrets
+.env
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

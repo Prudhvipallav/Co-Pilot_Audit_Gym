@@ -1,0 +1,8 @@
+{
+  "cold_start": true,
+  "seeded_at": "2026-03-28T16:25:57.360514",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "total_episodes": 0,
+  "avg_grader_score": 0.0,
+  "episodes": []
+}

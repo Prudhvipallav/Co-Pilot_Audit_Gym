@@ -20,7 +20,7 @@ from .models import (
     GovernanceAction, GovernanceObservation, ActionType,
     Severity, RiskLevel
 )
-from .policies import POLICY_CHECKS, POLICY_RULE_MAP
+from .policies import POLICY_CHECKS, POLICY_RULE_MAP, get_causal_hints
 from .tasks import load_task
 
 
@@ -100,6 +100,8 @@ class GovernanceReviewEnv(gym.Env):
             "missed_issues": [],
             "reward_total": 0.0,
             "episode_steps": [],    # For transcript tracking
+            "reward_log": [],       # Explainable reward decomposition
+            "causal_hints": [],     # Causal violation graph hints
         }
 
         obs = self._build_observation("Welcome! Inspect artifacts to begin the governance review.")
@@ -168,6 +170,19 @@ class GovernanceReviewEnv(gym.Env):
             info["timeout"] = True
 
         s["reward_total"] += reward
+
+        # Record reward with explanation
+        s["reward_log"].append({
+            "step": s["step_count"],
+            "action_type": action_dict.get("action_type", "unknown") if isinstance(action_dict, dict) else "unknown",
+            "detail": action_dict.get("target") or action_dict.get("issue_code") or "",
+            "reward": round(reward, 3),
+            "reason": message,
+        })
+
+        # Update causal hints when new flags are added
+        flagged_codes = [i["code"] for i in s["flagged_issues"]]
+        s["causal_hints"] = get_causal_hints(flagged_codes)
 
         # Record step for transcript
         try:
@@ -376,6 +391,12 @@ class GovernanceReviewEnv(gym.Env):
 
         s["review_stage"] = stage
 
+        # Build message with causal hints appended
+        causal_hints = s.get("causal_hints", [])
+        enriched_message = message
+        if causal_hints:
+            enriched_message += "\n" + " | ".join(causal_hints[:2])
+
         return GovernanceObservation(
             task_id=s["task_data"]["task_id"],
             feature_name=s["task_data"]["feature_name"],
@@ -391,7 +412,7 @@ class GovernanceReviewEnv(gym.Env):
             review_stage=stage,
             step_count=s["step_count"],
             max_steps=self.max_steps,
-            message=message,
+            message=enriched_message,
         )
 
     def _get_open_questions(self) -> List[str]:
@@ -452,6 +473,7 @@ class GovernanceReviewEnv(gym.Env):
         )
 
         return {
+            "task_id": s["task_data"]["task_id"],
             "safety": round(safety, 4),
             "compliance": round(compliance, 4),
             "completeness": round(completeness, 4),
@@ -485,6 +507,64 @@ class GovernanceReviewEnv(gym.Env):
             "total_steps": s["step_count"],
             "reviewer_model": self._reviewer_model,
         }
+
+    def get_reward_explanation(self) -> dict:
+        """Feature 1: Explainable Reward Decomposition.
+        Returns a full breakdown of why the agent got each reward.
+        """
+        s = self._episode_state
+        if not s:
+            return {"error": "No episode in progress"}
+
+        gt = s["ground_truth_violations"]
+        flagged = [i["code"] for i in s["flagged_issues"] if i.get("correct")]
+        fp = s["false_positives"]
+        mitigated = [m["issue_code"] for m in s["requested_mitigations"]]
+        missed = [v for v in gt if v not in flagged]
+
+        scores = self.get_grader_score()
+        optimal = self._compute_optimal_reward()
+        actual = s["reward_total"]
+        regret = round(max(0.0, optimal - actual), 3)
+
+        return {
+            "total_reward": round(actual, 3),
+            "optimal_reward": round(optimal, 3),
+            "regret": regret,
+            "regret_pct": round(regret / max(0.01, optimal) * 100, 1),
+            "step_breakdown": s["reward_log"],
+            "causal_hints": s.get("causal_hints", []),
+            "dimensions": scores,
+            "missed_violations": missed,
+            "false_positives": fp,
+            "safety_verdict": (
+                "✅ SAFE — caught all critical violations"
+                if scores["safety"] == 1.0
+                else f"🚨 UNSAFE — missed: {missed}"
+            ),
+        }
+
+    def _compute_optimal_reward(self) -> float:
+        """Feature 5: Counterfactual — what would perfect play have scored?"""
+        s = self._episode_state
+        gt = s["ground_truth_violations"]
+        num_artifacts = len(s["artifacts"])
+
+        # Optimal: inspect all (+0.2 each + completion +0.5),
+        # flag all correctly (+1.5 each), mitigate all (+1.0 each),
+        # correct risk (+0.5), correct decision (+4.0), correct risk tier (+2.0)
+        optimal = (
+            0.2 * num_artifacts + 0.2 + 0.5    # inspection
+            + 1.5 * len(gt)                     # correct flags
+            + 1.0 * len(gt)                     # mitigations
+            + 0.5                               # risk
+            + 4.0                               # final decision
+            + 2.0                               # risk tier
+        )
+        # Subtract time tax for minimum efficient steps
+        min_steps = num_artifacts + len(gt) * 2 + 3
+        optimal -= 0.05 * min_steps
+        return round(optimal, 3)
 
     def _get_effective_task_id(self) -> int:
         if len(self.episode_history) >= 5:

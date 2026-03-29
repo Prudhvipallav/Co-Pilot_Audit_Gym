@@ -236,17 +236,26 @@ def adversarial_task_endpoint(request: GenerateRequest = GenerateRequest()):
 
 @app.get("/curriculum")
 def curriculum_endpoint():
-    """Returns current curriculum state: difficulty, mastery progress, and next gate threshold."""
-    from training.curriculum import get_curriculum_info
-    from memory.weakness_map import get_violation_weights, load_weakness_map
-    info = get_curriculum_info()
+    """Returns current curriculum state: weakness map and difficulty progression."""
+    from memory.weakness_map import load_weakness_map
     wmap = load_weakness_map()
     sorted_weaknesses = sorted(
         [(code, d["miss_rate"]) for code, d in wmap.items()],
         key=lambda x: -x[1]
     )
+    # Derive difficulty from weakness map performance
+    avg_miss = sum(d["miss_rate"] for d in wmap.values()) / max(1, len(wmap))
+    if avg_miss > 0.6:
+        current_difficulty = "easy"
+    elif avg_miss > 0.35:
+        current_difficulty = "medium"
+    else:
+        current_difficulty = "hard"
     return {
-        "curriculum": info,
+        "curriculum": {
+            "current_difficulty": current_difficulty,
+            "avg_miss_rate": round(avg_miss, 4),
+        },
         "top_weaknesses": sorted_weaknesses[:4],
         "weakness_map": wmap,
     }
@@ -258,7 +267,7 @@ def health():
     cfg = load_config()
     return {
         "status": "healthy",
-        "version": "2.0.0",
+        "version": "3.1.0",
         "agents": {
             "reviewer": f"{cfg['reviewer']['provider']}:{cfg['reviewer']['model_id']}",
             "problem_maker": f"{cfg['problem_maker']['provider']}:{cfg['problem_maker']['model_id']}",
@@ -267,15 +276,151 @@ def health():
     }
 
 
+# ─── Feature 1: Explainable Reward Decomposition ─────────────
+
+@app.get("/explain")
+def explain():
+    """Return a full per-step breakdown of WHY the agent got each reward."""
+    try:
+        return env.get_reward_explanation()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── Feature 3: ELO Adaptive Difficulty ──────────────────────
+
+@app.get("/elo")
+def get_elo():
+    """Return current ELO rating, grade, and recommended task difficulty."""
+    from .elo import get_elo_tracker
+    tracker = get_elo_tracker()
+    return tracker.to_dict()
+
+
+@app.post("/elo/update")
+def update_elo(score: float):
+    """Update ELO after an episode. Pass the overall grader score."""
+    from .elo import get_elo_tracker
+    tracker = get_elo_tracker()
+    new_elo = tracker.update(score)
+    return {
+        "elo": new_elo,
+        "grade": tracker.get_grade(),
+        "recommended_task": tracker.select_task_id(),
+    }
+
+
+# ─── Feature 4: Adversarial Red Team Loop ────────────────────
+
+@app.post("/redteam/start")
+def redteam_start(task_id: int = 1, num_rounds: int = 3):
+    """Run N rounds of the adversarial red team self-play loop."""
+    import json
+    from .red_team import get_red_team_session
+    from .elo import get_elo_tracker
+    from .env import GovernanceReviewEnv
+    from .policies import run_all_checks, POLICY_RULE_MAP
+
+    def _rule_based_agent(obs: dict) -> dict:
+        """Deterministic baseline reviewer for red team rounds."""
+        inspected = obs.get("inspected_artifacts", [])
+        artifacts = list(obs.get("visible_artifacts", {}).keys())
+        flagged_codes = [i.get("code", "") for i in obs.get("flagged_issues", [])]
+        mitigated = [m.get("issue_code") for m in obs.get("requested_mitigations", [])]
+        risk = obs.get("current_risk")
+
+        for art in artifacts:
+            if art not in inspected:
+                return {"action_type": "inspect_artifact", "target": art}
+
+        full = obs.get("full_artifacts", {})
+        try:
+            for code, (passed, msg) in run_all_checks(full).items():
+                if not passed and code not in flagged_codes:
+                    rule = POLICY_RULE_MAP.get(code)
+                    return {"action_type": "flag_issue", "issue_code": code,
+                            "severity": rule.severity if rule else "high",
+                            "target": rule.artifact_hint if rule else "",
+                            "note": msg[:120]}
+        except Exception:
+            pass
+
+        for issue in obs.get("flagged_issues", []):
+            code = issue.get("code", "")
+            if code and code not in mitigated:
+                return {"action_type": "request_mitigation", "issue_code": code,
+                        "note": f"Remediate {code}"}
+
+        if obs.get("flagged_issues") and not risk:
+            sevs = [i.get("severity", "medium") for i in obs.get("flagged_issues", [])]
+            sv = "critical" if "critical" in sevs else "high" if "high" in sevs else "medium"
+            return {"action_type": "set_risk", "severity": sv}
+
+        if obs.get("flagged_issues"):
+            return {"action_type": "reject", "note": "Violations found"}
+        return {"action_type": "approve", "note": "No violations"}
+
+    session = get_red_team_session()
+    elo_tracker = get_elo_tracker()
+    results = []
+
+    for _ in range(num_rounds):
+        round_env = GovernanceReviewEnv(task_id=elo_tracker.select_task_id())
+        result = session.play_round(round_env, _rule_based_agent)
+        elo_tracker.update(result["scores"]["overall"])
+        result["elo_after"] = round(elo_tracker.elo, 1)
+        results.append(result)
+
+    return {
+        "rounds_played": num_rounds,
+        "leaderboard": session.get_leaderboard(),
+        "elo": elo_tracker.to_dict(),
+        "round_results": results,
+    }
+
+
+@app.get("/redteam/status")
+def redteam_status():
+    """Return current red team session leaderboard and history."""
+    from .red_team import get_red_team_session
+    from .elo import get_elo_tracker
+    session = get_red_team_session()
+    elo = get_elo_tracker()
+    return {
+        "leaderboard": session.get_leaderboard(),
+        "elo": elo.to_dict(),
+    }
+
+
+@app.post("/redteam/reset")
+def redteam_reset():
+    """Reset the red team session and ELO tracker."""
+    from .red_team import get_red_team_session
+    from .elo import get_elo_tracker
+    get_red_team_session().reset_session()
+    tracker = get_elo_tracker()
+    tracker.elo = 1000.0
+    tracker.round_history = []
+    tracker.save()
+    return {"status": "reset", "elo": 1000.0}
+
+
 @app.get("/")
 def root():
     return {
-        "name": "OpenEnv — AI Governance Review (Multi-Agent)",
+        "name": "CopilotAudit-Gym PRO v3.1",
         "endpoints": {
             "standard": ["/reset", "/step", "/state", "/tasks", "/grader", "/baseline"],
-            "multi_agent": ["/generate_task", "/mutate_task", "/judge"]
+            "multi_agent": ["/generate_task", "/mutate_task", "/judge"],
+            "advanced": ["/explain", "/elo", "/elo/update", "/redteam/start", "/redteam/status", "/redteam/reset"],
         },
-        "reviewer": "Qwen2.5-0.5B-Instruct (local)",
-        "judge": "API-based (gpt-4o or claude)",
+        "features": [
+            "Explainable reward decomposition (/explain)",
+            "Causal violation graph (in observation)",
+            "ELO-based adaptive difficulty (/elo)",
+            "Adversarial red team self-play (/redteam/start)",
+            "Counterfactual regret computation (/explain → regret_pct)",
+        ],
         "docs": "/docs"
     }
+
