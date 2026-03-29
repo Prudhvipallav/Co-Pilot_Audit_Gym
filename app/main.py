@@ -413,8 +413,8 @@ def redteam_reset():
     return {"status": "reset", "elo": 1000.0}
 
 
-@app.get("/")
-def root():
+@app.get("/info")
+def info():
     return {
         "name": "CopilotAudit-Gym PRO v3.1",
         "endpoints": {
@@ -429,6 +429,7 @@ def root():
             "Adversarial red team self-play (/redteam/start)",
             "Counterfactual regret computation (/explain → regret_pct)",
         ],
+        "dashboard": "/ui",
         "docs": "/docs"
     }
 

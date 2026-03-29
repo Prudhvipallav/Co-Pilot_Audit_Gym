@@ -435,6 +435,8 @@ class GovernanceReviewEnv(gym.Env):
 
     def get_grader_score(self) -> Dict[str, float]:
         """Deterministic multi-dimensional score in [0.0, 1.0]."""
+        if not self._episode_state.get("task_data"):
+            raise RuntimeError("Call reset() before get_grader_score()")
         s = self._episode_state
         gt = s["ground_truth_violations"]
         flagged = [i["code"] for i in s["flagged_issues"] if i.get("correct")]
