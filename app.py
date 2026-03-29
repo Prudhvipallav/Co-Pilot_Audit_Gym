@@ -75,6 +75,23 @@ label span { color: #475569 !important; font-weight: 500 !important; }
 
 /* Score cards */
 #score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+/* Force light mode — override Gradio dark mode */
+.dark .gr-group, .dark .gr-box, .dark .gr-panel, .dark .gr-form,
+.dark .gradio-container, .dark body { background: #F0F4FA !important; color: #1E293B !important; }
+.dark .gr-input, .dark .gr-dropdown, .dark .gr-textbox textarea, .dark select, .dark input[type=text] {
+    background: #FAFBFF !important; color: #1E293B !important; border: 1px solid #E2E8F0 !important;
+}
+.dark label span { color: #475569 !important; }
+.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose p, .dark .prose li,
+.dark .prose td, .dark .prose th, .dark .prose code { color: #1E293B !important; }
+.dark .prose a { color: #4F46E5 !important; }
+.dark .gr-tab-item { color: #64748B !important; }
+.dark .gr-tab-item.selected { color: #4F46E5 !important; }
+.dark .gr-accordion { background: #FFFFFF !important; }
+.dark .gr-button-primary { background: #4F46E5 !important; color: #fff !important; }
+.dark .gr-button-secondary { background: #F1F5F9 !important; color: #475569 !important; }
+.dark table, .dark th, .dark td { color: #1E293B !important; background: #FFFFFF !important; }
 """
 
 
@@ -476,7 +493,8 @@ def _update_action_doc(action_type):
 def create_app():
     with gr.Blocks(title="CopilotAudit-Gym PRO v3.1", css=CSS,
                    theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="slate",
-                                        neutral_hue="slate")) as demo:
+                                        neutral_hue="slate"),
+                   js="() => { document.body.classList.remove('dark'); }") as demo:
         env_state = gr.State(None)
         step_history = gr.State([])
 
