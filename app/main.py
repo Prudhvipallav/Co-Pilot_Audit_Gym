@@ -5,6 +5,7 @@ Endpoints: /generate_task, /mutate_task, /adversarial_task, /judge, /curriculum
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from typing import Optional
 import json, os, sys
 
@@ -430,15 +431,3 @@ def info():
         "docs": "/docs"
     }
 
-
-# ─── Mount Gradio Dashboard at /ui (SAFE — evaluation unaffected) ─────────────
-# This is wrapped in try/except. If Gradio fails for any reason,
-# FastAPI and ALL evaluation endpoints (/reset /step /grader etc.) keep working.
-try:
-    import gradio as _gr
-    from app_ui import create_app as _create_gradio_app
-    _demo = _create_gradio_app()
-    app = _gr.mount_gradio_app(app, _demo, path="/")
-    print("[Dashboard] ✅ Gradio dashboard mounted at /")
-except Exception as _e:
-    print(f"[Dashboard] ⚠️  Gradio not mounted (evaluation unaffected): {_e}")

@@ -925,5 +925,11 @@ Built for the [OpenEnv Hackathon](https://github.com/facebookresearch/openenv). 
 
 # ═══════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    app = create_app()
-    app.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    import uvicorn
+    from app.main import app as fastapi_app
+    import gradio as _mount_gr
+
+    demo = create_app()
+    combined = _mount_gr.mount_gradio_app(fastapi_app, demo, path="/")
+    print("[CopilotAudit-Gym] Gradio + FastAPI on port 7860")
+    uvicorn.run(combined, host="0.0.0.0", port=7860)
