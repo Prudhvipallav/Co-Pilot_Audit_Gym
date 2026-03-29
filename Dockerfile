@@ -16,6 +16,8 @@ COPY tests/ ./tests/
 COPY config.yaml .
 COPY openenv.yaml .
 COPY inference.py .
+COPY app.py ./app_ui.py
+COPY assets/ ./assets/
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:7860/health || exit 1

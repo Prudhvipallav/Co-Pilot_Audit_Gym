@@ -31,7 +31,15 @@ env = GovernanceReviewEnv(task_id=1)
 _last_generated_task: Optional[GeneratedTask] = None
 
 
-# ─── Original Required Endpoints ─────────────────────────────────
+# ─── Root redirect to Gradio UI ───────────────────────────────────
+from fastapi.responses import RedirectResponse
+
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    """Redirect root to the Gradio dashboard. All API endpoints are unaffected."""
+    return RedirectResponse(url="/ui")
+
+
 
 @app.post("/reset")
 def reset(request: ResetRequest = ResetRequest()):
@@ -424,3 +432,15 @@ def root():
         "docs": "/docs"
     }
 
+
+# ─── Mount Gradio Dashboard at /ui (SAFE — evaluation unaffected) ─────────────
+# This is wrapped in try/except. If Gradio fails for any reason,
+# FastAPI and ALL evaluation endpoints (/reset /step /grader etc.) keep working.
+try:
+    import gradio as _gr
+    from app_ui import create_app as _create_gradio_app
+    _demo = _create_gradio_app()
+    app = _gr.mount_gradio_app(app, _demo, path="/ui")
+    print("[Dashboard] ✅ Gradio dashboard mounted at /ui")
+except Exception as _e:
+    print(f"[Dashboard] ⚠️  Gradio not mounted (evaluation unaffected): {_e}")
