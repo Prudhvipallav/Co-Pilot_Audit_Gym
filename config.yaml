@@ -13,12 +13,16 @@
 # ─────────────────────────────────────────────────────────────────
 
 reviewer:
-  provider: local
-  model_id: Qwen/Qwen2.5-0.5B-Instruct
-  lora_path: "checkpoints/final_v8" # Path to trained model adapter
-  max_new_tokens: 512
-  temperature: 0.1          # Low = consistent, deterministic reviews
-  # No API key needed — runs on CPU via transformers
+  provider: google
+  model_id: gemini-1.5-flash
+  max_tokens: 512
+  temperature: 0.1
+  api_key_env: GEMINI_API_KEY
+  # For local inference (needs GPU/high RAM), uncomment below:
+  # provider: local
+  # model_id: Qwen/Qwen2.5-0.5B-Instruct
+  # lora_path: "checkpoints/final_v8"
+  # max_new_tokens: 512
 
 problem_maker:
   provider: google

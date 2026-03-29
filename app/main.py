@@ -422,7 +422,7 @@ def info():
             "Adversarial red team self-play (/redteam/start)",
             "Counterfactual regret computation (/explain → regret_pct)",
         ],
-        "dashboard": "/ui",
+        "dashboard": "/",
         "docs": "/docs"
     }
 
