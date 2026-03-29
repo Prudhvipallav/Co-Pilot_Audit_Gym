@@ -19,7 +19,7 @@ COPY inference.py .
 COPY app.py ./app_ui.py
 COPY assets/ ./assets/
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
   CMD curl -f http://localhost:7860/info || exit 1
 
 EXPOSE 7860

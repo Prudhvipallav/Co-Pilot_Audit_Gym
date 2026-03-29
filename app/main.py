@@ -6,7 +6,10 @@ Endpoints: /generate_task, /mutate_task, /adversarial_task, /judge, /curriculum
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-import json
+import json, os, sys
+
+# Ensure root is in path for app_ui import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .env import GovernanceReviewEnv
 from .graders import calculate_grader_score, validate_score_range, score_to_grade
@@ -26,6 +29,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 env = GovernanceReviewEnv(task_id=1)
 _last_generated_task: Optional[GeneratedTask] = None
