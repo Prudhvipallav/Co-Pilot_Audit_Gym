@@ -298,6 +298,21 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 python inference.py
 ```
 
+### Testing
+
+```bash
+# Run core tests (18 tests — no server needed):
+pytest tests/test_env.py -v
+
+# Run ALL 21 tests (3 API endpoint tests require a running server):
+# Terminal 1:
+uvicorn app.main:app --port 8000
+# Terminal 2:
+pytest tests/test_env.py -v
+```
+
+> **Note:** 3 tests in `TestAPIEndpoints` (`test_reset_endpoint`, `test_tasks_endpoint`, `test_baseline_endpoint`) require the FastAPI server running on port 8000. Without it, they fail with `ConnectionError` — this is expected. The core 18 tests cover the environment, policy checkers, graders, and reward logic without any server dependency.
+
 ### Environment Variables
 
 | Variable | Required | Description |
