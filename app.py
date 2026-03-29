@@ -891,7 +891,72 @@ This is the same mechanism behind AlphaGo's self-play. Both sides co-evolve.
                         gr.Markdown("### 💰 Reward Function")
                         gr.Markdown(_reward_ref_md())
 
-            # ════════════ TAB 5: ABOUT ════════════
+            # ════════════ TAB 5b: HOW TO USE ════════════
+            with gr.Tab("📚 How to Use"):
+                gr.Markdown("""### 📚 Step-by-Step Guide — How to Play
+
+**You are the AI governance reviewer.** An enterprise AI copilot wants to launch. Your job: inspect its documentation, find policy violations, and decide whether it's safe to deploy.
+
+---
+
+#### 🔁 The Review Flow (follow this order!)
+
+| Step | Action Type | What You Do | Reward |
+|---|---|---|---|
+| 1 | `inspect` | Read each of the 9 artifacts to understand the system | +0.15 to +0.65 each |
+| 2 | `flag` | Flag violations you found with the correct code & severity | +1.5 correct, -0.5 false positive |
+| 3 | `request_mitigation` | Request a fix for each violation you flagged | +0.8 each |
+| 4 | `set_risk` | Set the overall risk level (low/medium/high/critical) | +0.45 if correct |
+| 5 | `approve` / `reject` / `escalate` | Make your final decision | +4.0 correct, -6.0 wrong |
+
+---
+
+#### 🎯 Quick Walkthrough (Task 1 — Easy)
+
+1. **Select Task 1** and click **🔄 Reset Episode**
+2. **Inspect all 9 artifacts** one by one:
+   - Set Action Type → `inspect`, target → `product_spec.md` → ⚡ Execute
+   - Repeat for: `data_sources.json`, `model_card.json`, `eval_report.json`, `logging_policy.yaml`, `retention_policy.yaml`, `human_oversight.md`, `security_review.md`, `incident_history.json`
+3. **Read the observation messages** — they contain hints about violations
+4. **Flag the violation** you found:
+   - Action Type → `flag`, target → the artifact, issue_code → e.g. `AUDIT-007`, severity → `critical`
+5. **Request mitigation**: Action Type → `request_mitigation`, issue_code → `AUDIT-007`
+6. **Set risk**: Action Type → `set_risk`, severity → `high`
+7. **Decide**: Action Type → `reject` (because violations were found)
+8. **Check your score** — aim for Grade A!
+
+---
+
+#### 🔍 Violation Codes Cheat Sheet
+
+| Code | What It Means | Look For... |
+|---|---|---|
+| `PII-001` | PII in logs | SSN, email, names in logging/telemetry configs |
+| `RETAIN-002` | Retention > 90 days | Retention periods exceeding the limit |
+| `AUDIT-007` | Missing audit trail | Gaps in logging coverage |
+| `TRAINING-006` | Bad training data | Unlicensed or biased datasets |
+| `HUMAN-003` | No human escalation | Missing human-in-the-loop |
+| `DOMAIN-004` | No domain expert sign-off | Missing specialist validation |
+| `ENCRYPT-005` | Missing encryption | No encryption at rest/transit |
+| `BIAS-008` | No fairness testing | Missing bias evaluation |
+
+---
+
+#### 📊 Understanding Your Score
+
+- **Grade A (≥0.9)** — Perfect review, all violations caught
+- **Grade B (≥0.75)** — Good review, minor misses
+- **Grade C (≥0.5)** — Decent but missed important violations
+- **Grade D (≥0.25)** — Poor review, many misses
+- **Grade F (<0.25)** — UNSAFE — missed critical violations
+
+**Regret %** = how much better you could have done vs the optimal agent.
+Lower is better — 0% means perfect!
+
+> 💡 **Pro Tip:** Always inspect ALL 9 artifacts before flagging. The observation text contains clues about which violations exist!
+""")
+
+            # ════════════ TAB 6: ABOUT ════════════
             with gr.Tab("ℹ️ About"):
                 gr.Markdown("""### 🏛️ CopilotAudit-Gym PRO v3.1
 

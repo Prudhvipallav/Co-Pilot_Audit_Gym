@@ -369,6 +369,150 @@ pytest tests/test_env.py -v
 
 ---
 
+## 📚 How to Use — Step-by-Step Guide
+
+### Using the Interactive Dashboard
+
+The dashboard is available at [huggingface.co/spaces/Prudhvi06/Co-Pilot_Audit_Gym](https://huggingface.co/spaces/Prudhvi06/Co-Pilot_Audit_Gym) or locally via `python app.py`.
+
+#### 🎮 Tab 1: Manual Review (Play as the Reviewer)
+
+You play the role of the AI governance reviewer. Follow this exact flow for the best score:
+
+**Step 1 — Select & Reset**
+1. Pick a task difficulty: Easy (1 violation), Medium (2), or Hard (3)
+2. Click **🔄 Reset Episode** to load the scenario
+
+**Step 2 — Inspect All Artifacts (mandatory)**
+3. Set **Action Type** → `inspect`
+4. Set **target** → `product_spec.md`
+5. Click **⚡ Execute Action**
+6. Repeat for all 9 artifacts: `data_sources.json`, `model_card.json`, `eval_report.json`, `logging_policy.yaml`, `retention_policy.yaml`, `human_oversight.md`, `security_review.md`, `incident_history.json`
+7. Each inspection earns **+0.15 to +0.65 reward** and reveals violation hints in the observation message
+
+**Step 3 — Flag Violations**
+8. Set **Action Type** → `flag`
+9. Set **target** → the artifact containing the violation
+10. Set **issue_code** → the violation code (e.g., `PII-001`, `TRAINING-006`, `DOMAIN-004`)
+11. Set **severity** → `low`, `medium`, `high`, or `critical`
+12. Click **⚡ Execute Action**
+13. Correct flags earn **+1.5 reward**; false positives cost **-0.5**
+
+**Step 4 — Request Mitigations**
+14. Set **Action Type** → `request_mitigation`
+15. Set **issue_code** → the violation you flagged
+16. Click **⚡ Execute Action**
+17. Each correct mitigation earns **+0.8 reward**
+
+**Step 5 — Set Risk & Decide**
+18. Set **Action Type** → `set_risk` with severity matching the violations found
+19. Click **⚡ Execute Action**
+20. Set **Action Type** → `approve` (no violations), `reject` (violations found), or `escalate` (uncertain)
+21. Click **⚡ Execute Action**
+22. Correct decision earns **+4.0 reward**; wrong decision costs up to **-6.0**
+
+**Reading Your Score:**
+- **Grade A–E:** Based on weighted dimensions (Safety 35%, Compliance 25%, Completeness 20%, Precision 10%, Mitigation 10%)
+- **Reward Explanation:** Shows actual vs optimal reward and regret percentage
+- **Safety Verdict:** "Safe" if all critical violations were flagged; "UNSAFE" if any were missed
+
+> **Pro Tip:** The violation codes are visible in the artifact observation text. Look for hints like "contains PII fields" or "no human escalation defined" in the inspection results.
+
+#### 🎯 Tab 2: Automated Benchmark
+
+Click **▶ Run Benchmark** to watch the rule-based expert agent review all 3 tasks automatically. The action log shows every step the expert takes, and the reward explanation shows the optimal score.
+
+#### 🧩 Tab 3: Multi-Agent Pipeline
+
+This triggers the full 3-agent loop:
+1. **Problem Maker** (Gemini) generates an adversarial scenario
+2. **Reviewer** audits the scenario
+3. **Judge** (3 personas: Junior, Senior, Principal) scores the review
+
+> Requires `GEMINI_API_KEY` environment variable. Without it, the system falls back to template-based generation.
+
+#### 🥊 Tab 4: Red Team Arena
+
+Self-play adversarial training where the Problem Maker and Reviewer co-evolve:
+- Click **Start Red Team** to begin a round
+- Watch the ELO ratings update after each round
+- The Problem Maker learns to exploit the Reviewer's weaknesses
+
+---
+
+### Using the API (Programmatic Access)
+
+All endpoints are available at `http://localhost:7860` (or the HF Space URL):
+
+```bash
+# Reset environment to Task 1
+curl -X POST http://localhost:7860/reset -H "Content-Type: application/json" \
+  -d '{"task_id": 1}'
+
+# Inspect an artifact
+curl -X POST http://localhost:7860/step -H "Content-Type: application/json" \
+  -d '{"action": "inspect", "target": "product_spec.md"}'
+
+# Flag a violation
+curl -X POST http://localhost:7860/step -H "Content-Type: application/json" \
+  -d '{"action": "flag", "target": "data_sources.json", "issue_code": "PII-001", "severity": "critical"}'
+
+# Get the grader score
+curl http://localhost:7860/grader
+
+# Get reward explanation
+curl http://localhost:7860/explain
+
+# Full Swagger documentation
+open http://localhost:7860/docs
+```
+
+### Using with Python (RL Training)
+
+```python
+import requests
+
+BASE = "http://localhost:7860"
+
+# Reset
+obs = requests.post(f"{BASE}/reset", json={"task_id": 1}).json()
+print(obs["message"])  # Scenario description
+
+# Inspect all artifacts
+for artifact in obs["artifacts"]:
+    step = requests.post(f"{BASE}/step", json={
+        "action": "inspect",
+        "target": artifact
+    }).json()
+    print(f"Inspected {artifact}: reward={step['reward']}")
+
+# Flag violations found during inspection
+step = requests.post(f"{BASE}/step", json={
+    "action": "flag",
+    "target": "data_sources.json",
+    "issue_code": "PII-001",
+    "severity": "critical"
+}).json()
+
+# Get final score
+score = requests.get(f"{BASE}/grader").json()
+print(f"Grade: {score['grade']}, Safety: {score['safety']}")
+```
+
+### Policy Violation Codes Reference
+
+| Code | Rule | What to Look For |
+|---|---|---|
+| `PII-001` | No PII in Logs | Personal data (SSN, email, name) in logging or telemetry configs |
+| `RETAIN-002` | Data Retention ≤ 90 Days | Retention policies exceeding 90-day limit |
+| `AUDIT-007` | Complete Audit Trail | Missing audit logging, incomplete trace coverage |
+| `TRAINING-006` | Training Data Compliance | Using unlicensed, biased, or non-consented training data |
+| `HUMAN-003` | Human Escalation Required | No human-in-the-loop for high-stakes decisions |
+| `DOMAIN-004` | Domain Expert Validation | No domain-specific expert sign-off for specialized domains |
+| `ENCRYPT-005` | Data Encryption Standards | Missing encryption at rest or in transit |
+| `BIAS-008` | Bias and Fairness Testing | No fairness evaluation or disparate impact testing |
+
+
 ## License
 
 MIT
