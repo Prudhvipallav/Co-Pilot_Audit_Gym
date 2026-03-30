@@ -13,9 +13,9 @@ COPY memory/ ./memory/
 COPY config.yaml .
 COPY openenv.yaml .
 COPY inference.py .
-COPY app.py .
+COPY app.py ./app_ui.py
 COPY assets/ ./assets/
 
 EXPOSE 7860
 
-CMD ["python", "app.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

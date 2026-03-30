@@ -431,3 +431,13 @@ def info():
         "docs": "/docs"
     }
 
+
+# ─── Mount Gradio Dashboard at / ─────────────────────────────────────────────
+try:
+    from app_ui import create_app as _create_gradio_app
+    import gradio as _gr
+    _demo = _create_gradio_app()
+    app = _gr.mount_gradio_app(app, _demo, path="/")
+    print("[Dashboard] ✅ Gradio mounted at /")
+except Exception as _e:
+    print(f"[Dashboard] ⚠️ Gradio not mounted: {_e}")
