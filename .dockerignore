@@ -1,0 +1,16 @@
+# Skip large/unnecessary files from Docker build context
+uv.lock
+pyproject.toml
+server/
+checkpoints/
+_dev/
+.git/
+.gitignore
+*.md
+!README.md
+hf_deploy/
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
