@@ -18,7 +18,7 @@ import requests
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-ENV_URL = os.getenv("GOVERNANCE_ENV_URL", "http://localhost:8000")
+ENV_URL = os.getenv("GOVERNANCE_ENV_URL", "https://prudhvi06-co-pilot-audit-gym.hf.space")
 
 MAX_STEPS = 25
 TEMPERATURE = 0.2

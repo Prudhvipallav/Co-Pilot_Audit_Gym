@@ -315,12 +315,17 @@ pytest tests/test_env.py -v
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `API_BASE_URL` | For inference | LLM API endpoint |
-| `MODEL_NAME` | For inference | Model ID for the agent |
-| `HF_TOKEN` | For inference | HuggingFace API token |
-| `GEMINI_API_KEY` | For adversarial mode | Problem Maker & Judge |
+The following environment variables are used by `inference.py` and the multi-agent pipeline:
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `API_BASE_URL` | For LLM inference | `https://router.huggingface.co/v1` | OpenAI-compatible API endpoint |
+| `MODEL_NAME` | For LLM inference | `gpt-4o-mini` | Model ID for the reviewer agent |
+| `HF_TOKEN` | For LLM inference | — | HuggingFace API token (or set `API_KEY`) |
+| `GOVERNANCE_ENV_URL` | For inference.py | `https://prudhvi06-co-pilot-audit-gym.hf.space` | Environment server URL |
+| `GEMINI_API_KEY` | For multi-agent pipeline | — | Google Gemini API key (Problem Maker & Judge) |
+
+> **Note:** If no `HF_TOKEN` or `API_KEY` is set, `inference.py` automatically falls back to a deterministic rule-based agent.
 
 ---
 
