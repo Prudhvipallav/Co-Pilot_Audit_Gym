@@ -470,7 +470,8 @@ def manual_step(env, history, action_type, target, issue_code, severity, note):
 
 TASK_CHOICES = [("Task 1 · Easy — CustomerCare AI", 1),
                 ("Task 2 · Medium — HRAdvisor AI", 2),
-                ("Task 3 · Hard — WealthWise Copilot", 3)]
+                ("Task 3 · Hard — WealthWise Copilot", 3),
+                ("Task 4 · Expert — MedFlow Clinical", 4)]
 
 ACTION_TYPES = ["inspect_artifact", "flag_issue", "request_mitigation",
                 "set_risk", "approve", "reject", "escalate"]

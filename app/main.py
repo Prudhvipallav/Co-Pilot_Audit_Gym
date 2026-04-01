@@ -36,13 +36,16 @@ env = GovernanceReviewEnv(task_id=1)
 _last_generated_task: Optional[GeneratedTask] = None
 
 
-
+@app.get("/health")
+def health():
+    """Lightweight health check — zero dependencies, instant 200."""
+    return {"status": "healthy"}
 
 
 @app.post("/reset")
 def reset(request: ResetRequest = ResetRequest()):
     global env, _last_generated_task
-    task_id = max(1, min(3, request.task_id or 1))
+    task_id = max(1, min(4, request.task_id or 1))
     env = GovernanceReviewEnv(task_id=task_id)
     options = {}
     if request.use_generated_task and _last_generated_task:

@@ -206,7 +206,7 @@ def main():
         print("⚠️  No API key found (HF_TOKEN/API_KEY). Using rule-based fallback agent.")
 
     scores = []
-    for task_id in [1, 2, 3]:
+    for task_id in [1, 2, 3, 4]:
         try:
             if use_llm:
                 score = run_inference_episode(task_id, client)

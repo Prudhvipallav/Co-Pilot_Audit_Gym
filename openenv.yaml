@@ -19,6 +19,10 @@ tasks:
     name: WealthWise Financial Copilot
     difficulty: hard
     description: "Uncover hidden adversarial violations requiring deep cross-referencing of specs."
+  - id: 4
+    name: MedFlow Clinical Decision Support
+    difficulty: expert
+    description: "Cross-artifact reasoning required — violations only detectable by comparing multiple documents. Includes red herrings."
 
 action_space:
   type: dict

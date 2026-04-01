@@ -376,8 +376,14 @@ class GovernanceReviewEnv(gym.Env):
         s = self._episode_state
         artifacts = s["artifacts"]
 
-        # Previews for all artifacts (300 chars)
-        visible = {k: v[:300] + "..." if len(v) > 300 else v for k, v in artifacts.items()}
+        # Metadata-only previews for uninspected artifacts (no content leak)
+        visible = {}
+        for k, v in artifacts.items():
+            if k in s["inspected_artifacts"]:
+                visible[k] = v[:300] + "..." if len(v) > 300 else v
+            else:
+                ext = k.rsplit(".", 1)[-1] if "." in k else "unknown"
+                visible[k] = f"[{ext.upper()} file — {len(v)} chars] Use inspect_artifact to view content."
 
         # Full content only for inspected artifacts
         full = {k: artifacts[k] for k in s["inspected_artifacts"]}

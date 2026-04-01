@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 
 def load_task(task_id: int, seed: Optional[int] = None) -> Dict[str, Any]:
-    tasks = {1: _task_1_easy, 2: _task_2_medium, 3: _task_3_hard}
+    tasks = {1: _task_1_easy, 2: _task_2_medium, 3: _task_3_hard, 4: _task_4_expert}
     loader = tasks.get(task_id, _task_1_easy)
     return loader()
 
@@ -398,6 +398,201 @@ PII masking and audit trail requirements under review by security team.
     {"date": "2024-03-01", "severity": "low",
      "description": "401k balance displayed incorrectly due to API timeout",
      "resolution": "Retry logic added"}
+  ]
+}"""
+        }
+    }
+
+
+def _task_4_expert() -> Dict[str, Any]:
+    """
+    EXPERT: Clinical Decision Support Copilot
+    Four violations requiring cross-artifact reasoning:
+    - PII-001: Only detectable by comparing data_sources.json + logging_policy.yaml
+              (logging captures "all source fields" but data_sources has PHI)
+    - TRAINING-006: model_card says "federated learning on partner data" but
+                    data_sources shows no consent field for partner_hospital_records
+    - EVAL-008: eval_report covers "diagnosis accuracy" but product_spec lists
+                "drug interaction checking" which isn't evaluated at all
+    - DOMAIN-004: product_spec mentions "dosage adjustment recommendations"
+                  which requires licensed pharmacist sign-off (not present)
+
+    Red herrings:
+    - security_review.md mentions "penetration test findings" (sounds alarming, but resolved)
+    - retention_policy looks strict (30 days) — actually compliant
+    - incident_history has a scary-sounding incident that was properly handled
+
+    Expected: REJECT (critical patient safety violations)
+    """
+    return {
+        "task_id": "task_4_expert",
+        "feature_name": "MedFlow Clinical Decision Support",
+        "feature_summary": (
+            "AI-powered clinical decision support for hospital physicians. "
+            "Assists with differential diagnosis, drug interaction checks, "
+            "and treatment plan suggestions based on patient records and "
+            "latest medical literature. Deployed across 12 partner hospitals."
+        ),
+        "ground_truth_violations": ["PII-001", "TRAINING-006", "EVAL-008", "DOMAIN-004"],
+        "expected_risk": "critical",
+        "expected_decision": "reject",
+        "artifacts": {
+            "product_spec.md": """# MedFlow Clinical Decision Support — Product Spec v2.1
+
+## Overview
+Clinical decision support tool for attending physicians in partner hospitals.
+Reduces diagnostic turnaround time by 40% in pilot studies.
+
+## Core Capabilities
+- Differential diagnosis suggestions based on symptoms + lab results
+- Drug interaction checking against patient medication list
+- Treatment plan templates from evidence-based guidelines
+- Dosage adjustment recommendations based on patient weight, age, and renal function
+- Lab result trend visualization
+
+## Data Access
+- Electronic Health Records (EHR) via HL7 FHIR API
+- Hospital pharmacy database (read-only)
+- PubMed/clinical guideline API
+- Partner hospital anonymized case database
+
+## Users
+~450 attending physicians across 12 hospitals
+
+## Regulatory
+- Classified as Clinical Decision Support Software (non-device)
+- Section 3060 exemption filed with FDA
+""",
+            "data_sources.json": """{
+  "sources": [
+    {"name": "ehr_fhir_api", "sensitivity": "critical", "contains_pii": true,
+     "pii_types": ["patient_name", "dob", "mrn", "ssn", "diagnosis_codes", "medications"],
+     "access_level": "read_only"},
+    {"name": "pharmacy_db", "sensitivity": "high", "contains_pii": true,
+     "pii_types": ["patient_id", "medication_list", "allergies"]},
+    {"name": "pubmed_api", "sensitivity": "public", "contains_pii": false},
+    {"name": "partner_hospital_records", "sensitivity": "critical", "contains_pii": true,
+     "pii_types": ["anonymized_case_data", "treatment_outcomes"],
+     "consent_status": "institutional_agreement_only",
+     "individual_consent": false,
+     "note": "De-identified per Safe Harbor but used for model training"}
+  ],
+  "sensitive": true,
+  "access_controls": "role_based_with_mfa",
+  "logging_scope": "all_source_fields"
+}""",
+            "model_card.json": """{
+  "model_name": "MedFlow-DxAssist-v2",
+  "provider": "internal",
+  "base_model": "Llama-3-70B-medical-fine-tuned",
+  "training_methodology": "federated_learning",
+  "training_data_sources": ["pubmed_abstracts", "clinical_guidelines", "partner_hospital_records"],
+  "training_consent": "institutional_review_board_approved",
+  "individual_patient_consent_for_training": "not_applicable_per_safe_harbor",
+  "risk_level": "high",
+  "specialization": "differential_diagnosis_and_treatment_planning",
+  "last_red_team": "2024-02-28",
+  "red_team_scope": "prompt_injection, hallucination, off-label_drug_suggestions",
+  "known_limitations": ["rare_disease_accuracy_low", "pediatric_dosing_not_validated"]
+}""",
+            "eval_report.json": """{
+  "eval_date": "2024-03-15",
+  "coverage": ["diagnosis_accuracy", "treatment_plan_relevance", "response_latency"],
+  "methodology": "retrospective_chart_review_500_cases",
+  "scores": {
+    "diagnosis_top3_accuracy": 0.87,
+    "treatment_relevance": 0.82,
+    "p95_latency_ms": 340
+  },
+  "adversarial_testing": "prompt_injection_176_cases_tested",
+  "bias_evaluation": "demographic_parity_checked_across_age_gender",
+  "gaps_acknowledged": "drug_interaction_module_eval_deferred_to_pharmacy_vendor",
+  "notes": "Dosage adjustment module tested only on adult patients (18+)"
+}""",
+            "logging_policy.yaml": """# Logging — MedFlow Clinical Decision Support
+version: 2.0
+
+capture: comprehensive
+fields_logged:
+  - query_text
+  - model_response
+  - source_documents_retrieved
+  - all_source_fields_from_data_pipeline
+  # NOTE: 'all_source_fields' includes whatever the data sources provide
+  # This is needed for audit trail and reproducibility
+
+pii_filter: enabled
+pii_filter_scope: query_text_and_response_only
+# Filter does NOT cover source_documents or data_pipeline fields
+
+log_retention_days: 30
+log_destination: s3://medflow-audit-logs/
+encryption: AES-256-at-rest
+""",
+            "retention_policy.yaml": """# Data Retention — MedFlow
+conversation_history: 30
+model_outputs: 30
+patient_context: 7
+audit_logs: 365
+training_snapshots: 90
+# All within compliance thresholds
+""",
+            "human_oversight.md": """# Human Oversight — MedFlow
+
+## Physician-in-the-Loop
+All MedFlow outputs are advisory only. Physicians make final clinical decisions.
+
+## Escalation
+- Confidence score < 0.7 → flagged for senior physician review
+- Rare disease detected → automatic referral to specialist
+- Pediatric cases → routed to pediatric specialist (system not validated for pediatrics)
+
+## Clinical Review Board
+- Quarterly review of MedFlow accuracy metrics
+- Monthly audit of edge cases and near-misses
+- Annual re-validation study required
+
+## Override
+Physicians can dismiss any MedFlow suggestion with one click
+""",
+            "security_review.md": """# Security Review — MedFlow v2.1
+
+## Authentication
+- SAML SSO with hospital IdP ✅
+- MFA required for all access ✅
+- Session timeout: 15 min ✅
+
+## Network Security
+- TLS 1.3 in transit ✅
+- AES-256 at rest ✅
+- VPN required for remote access ✅
+
+## Penetration Test (2024-01-15)
+- 1 medium finding: session token rotation interval too long (fixed 2024-01-20)
+- 2 low findings: both resolved
+- Re-test passed 2024-02-01
+
+## HIPAA Compliance
+- BAA signed with all 12 partner hospitals ✅
+- Annual HIPAA risk assessment: passed (2024-01-30)
+- Encryption standards: compliant
+
+## Access Logging
+- All access logged with user ID, timestamp, patient MRN
+- Suspicious access alerts configured
+""",
+            "incident_history.json": """{
+  "incidents": [
+    {"date": "2024-01-05", "severity": "high",
+     "description": "MedFlow suggested contraindicated drug combination for patient with renal impairment",
+     "resolution": "Pharmacy cross-check module added as hard gate, deployed 2024-01-12",
+     "root_cause": "Training data insufficient for renal-adjusted dosing",
+     "patients_affected": 1,
+     "harm_occurred": false,
+     "physician_caught_error": true},
+    {"date": "2024-02-20", "severity": "low",
+     "description": "Slow response time (>5s) during peak hours",
+     "resolution": "Horizontal scaling added, p95 now <400ms"}
   ]
 }"""
         }
