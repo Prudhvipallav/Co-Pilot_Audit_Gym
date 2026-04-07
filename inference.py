@@ -50,12 +50,15 @@ Rules:
 
 def run_inference_episode(task_id: int, client: OpenAI):
     """Run a single episode against the environment."""
+    TASK_DIFFICULTY = {1: "easy", 2: "medium", 3: "hard", 4: "expert"}
     resp = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id})
     resp.raise_for_status()
     obs = resp.json()["observation"]
     task_name = obs.get("feature_name", f"task_{task_id}")
+    difficulty = TASK_DIFFICULTY.get(task_id, "unknown")
+    n_artifacts = len(obs.get("visible_artifacts", {}))
 
-    print(f"[START] task={task_name}", flush=True)
+    print(f"[START] task={task_name} task_id={task_id} difficulty={difficulty} artifacts={n_artifacts}", flush=True)
 
     history = []
     total_reward = 0.0
@@ -100,27 +103,35 @@ def run_inference_episode(task_id: int, client: OpenAI):
         obs = result["observation"]
         reward = result["reward"]
         total_reward += reward
+        detail = action_dict.get("target") or action_dict.get("issue_code") or ""
 
-        print(f"[STEP] step={step} reward={reward:.4f} action={action_dict.get('action_type','?')}", flush=True)
+        print(f"[STEP] step={step} reward={reward:.4f} action={action_dict.get('action_type','?')} detail={detail} cumulative_reward={total_reward:.4f}", flush=True)
 
         if result["done"]:
             break
 
     grader_resp = requests.get(f"{ENV_URL}/grader")
     score_data = grader_resp.json()
-    score = score_data['scores']['overall']
+    scores = score_data.get('scores', {})
+    grade = score_data.get('grade', 'N/A')
 
-    print(f"[END] task={task_name} score={score:.4f} steps={step}", flush=True)
-    return score
+    print(f"[END] task={task_name} score={scores.get('overall',0):.4f} steps={step} grade={grade} "
+          f"safety={scores.get('safety',0):.2f} compliance={scores.get('compliance',0):.2f} "
+          f"completeness={scores.get('completeness',0):.2f} precision={scores.get('precision',0):.2f} "
+          f"mitigation={scores.get('mitigation_quality',0):.2f} total_reward={total_reward:.4f}", flush=True)
+    return scores.get('overall', 0)
 
 def run_rule_based_episode(task_id: int):
     """Fallback: deterministic rule-based agent when no API key available."""
+    TASK_DIFFICULTY = {1: "easy", 2: "medium", 3: "hard", 4: "expert"}
     resp = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id})
     resp.raise_for_status()
     obs = resp.json()["observation"]
     task_name = obs.get("feature_name", f"task_{task_id}")
+    difficulty = TASK_DIFFICULTY.get(task_id, "unknown")
+    n_artifacts = len(obs.get("visible_artifacts", {}))
 
-    print(f"[START] task={task_name}", flush=True)
+    print(f"[START] task={task_name} task_id={task_id} difficulty={difficulty} artifacts={n_artifacts}", flush=True)
 
     total_reward = 0.0
     step = 0
@@ -134,7 +145,7 @@ def run_rule_based_episode(task_id: int):
         reward = r["reward"]
         total_reward += reward
         obs = r["observation"]
-        print(f"[STEP] step={step} reward={reward:.4f} action=inspect_artifact", flush=True)
+        print(f"[STEP] step={step} reward={reward:.4f} action=inspect_artifact detail={art_name} cumulative_reward={total_reward:.4f}", flush=True)
         if r["done"]:
             break
 
@@ -158,7 +169,7 @@ def run_rule_based_episode(task_id: int):
             reward = r["reward"]
             total_reward += reward
             obs = r["observation"]
-            print(f"[STEP] step={step} reward={reward:.4f} action=flag_issue", flush=True)
+            print(f"[STEP] step={step} reward={reward:.4f} action=flag_issue detail={code} cumulative_reward={total_reward:.4f}", flush=True)
             if r["done"]:
                 break
 
@@ -170,7 +181,7 @@ def run_rule_based_episode(task_id: int):
             reward = r["reward"]
             total_reward += reward
             obs = r["observation"]
-            print(f"[STEP] step={step} reward={reward:.4f} action=request_mitigation", flush=True)
+            print(f"[STEP] step={step} reward={reward:.4f} action=request_mitigation detail={code} cumulative_reward={total_reward:.4f}", flush=True)
             if r["done"]:
                 break
 
@@ -183,7 +194,7 @@ def run_rule_based_episode(task_id: int):
         reward = r["reward"]
         total_reward += reward
         obs = r["observation"]
-        print(f"[STEP] step={step} reward={reward:.4f} action=set_risk", flush=True)
+        print(f"[STEP] step={step} reward={reward:.4f} action=set_risk detail=high cumulative_reward={total_reward:.4f}", flush=True)
 
     if not r.get("done", False):
         step += 1
@@ -192,14 +203,18 @@ def run_rule_based_episode(task_id: int):
         })}).json()
         reward = r["reward"]
         total_reward += reward
-        print(f"[STEP] step={step} reward={reward:.4f} action=reject", flush=True)
+        print(f"[STEP] step={step} reward={reward:.4f} action=reject detail=final_decision cumulative_reward={total_reward:.4f}", flush=True)
 
     grader_resp = requests.get(f"{ENV_URL}/grader")
     score_data = grader_resp.json()
-    score = score_data['scores']['overall']
+    scores = score_data.get('scores', {})
+    grade = score_data.get('grade', 'N/A')
 
-    print(f"[END] task={task_name} score={score:.4f} steps={step}", flush=True)
-    return score
+    print(f"[END] task={task_name} score={scores.get('overall',0):.4f} steps={step} grade={grade} "
+          f"safety={scores.get('safety',0):.2f} compliance={scores.get('compliance',0):.2f} "
+          f"completeness={scores.get('completeness',0):.2f} precision={scores.get('precision',0):.2f} "
+          f"mitigation={scores.get('mitigation_quality',0):.2f} total_reward={total_reward:.4f}", flush=True)
+    return scores.get('overall', 0)
 
 
 def main():
