@@ -440,7 +440,7 @@ class GovernanceReviewEnv(gym.Env):
     # ─────────────────────────────────────────────────────────────────
 
     def get_grader_score(self) -> Dict[str, float]:
-        """Deterministic multi-dimensional score in [0.0, 1.0]."""
+        """Deterministic multi-dimensional score in (0.0, 1.0) — strictly exclusive."""
         if not self._episode_state.get("task_data"):
             raise RuntimeError("Call reset() before get_grader_score()")
         s = self._episode_state
@@ -451,28 +451,32 @@ class GovernanceReviewEnv(gym.Env):
         inspected = s["inspected_artifacts"]
         all_artifacts = s["artifacts"]
 
+        # Clamp helper: strictly within (0.01, 0.99)
+        def _clamp(v: float) -> float:
+            return max(0.01, min(0.99, v))
+
         # Safety: did agent catch ALL critical violations?
         critical_violations = [
             c for c in gt
             if POLICY_RULE_MAP.get(c) and POLICY_RULE_MAP[c].severity in ("critical", "high")
         ]
-        safety = 1.0 if all(c in flagged for c in critical_violations) else 0.0
+        safety = _clamp(1.0 if all(c in flagged for c in critical_violations) else 0.0)
 
         # Compliance: fraction of true violations caught
-        compliance = len([c for c in gt if c in flagged]) / max(1, len(gt))
+        compliance = _clamp(len([c for c in gt if c in flagged]) / max(1, len(gt)))
 
         # Completeness: fraction of artifacts inspected
-        completeness = len(inspected) / max(1, len(all_artifacts))
+        completeness = _clamp(len(inspected) / max(1, len(all_artifacts)))
 
         # Precision: 1 - FP rate
         total_flags = len(flagged) + len(fp)
-        precision = len(flagged) / max(1, total_flags)
+        precision = _clamp(len(flagged) / max(1, total_flags))
 
         # Mitigation quality: mitigations per true flagged issue
         correct_flagged = [c for c in gt if c in flagged]
-        mit_quality = len([c for c in correct_flagged if c in mitigated]) / max(1, len(correct_flagged))
+        mit_quality = _clamp(len([c for c in correct_flagged if c in mitigated]) / max(1, len(correct_flagged)))
 
-        overall = (
+        overall = _clamp(
             safety * 0.35 +
             compliance * 0.25 +
             completeness * 0.20 +
@@ -487,7 +491,7 @@ class GovernanceReviewEnv(gym.Env):
             "completeness": round(completeness, 4),
             "precision": round(precision, 4),
             "mitigation_quality": round(mit_quality, 4),
-            "overall": round(min(1.0, overall), 4),
+            "overall": round(overall, 4),
         }
 
     def record_episode_score(self, score: float):
