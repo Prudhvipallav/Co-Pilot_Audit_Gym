@@ -14,10 +14,10 @@ from typing import List, Optional, Dict
 from openai import OpenAI
 import requests
 
-# Required environment variables
+# Required environment variables (per hackathon spec)
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
 ENV_URL = os.getenv("GOVERNANCE_ENV_URL", "https://prudhvi06-co-pilot-audit-gym.hf.space")
 
 MAX_STEPS = 25
@@ -212,13 +212,13 @@ def main():
         return
 
     # Determine agent mode
-    use_llm = bool(API_KEY)
+    use_llm = bool(HF_TOKEN)
     if use_llm:
-        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-        print(f"🤖 Using LLM agent: {MODEL_NAME}")
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+        print(f"🤖 Using LLM agent: {MODEL_NAME}", flush=True)
     else:
         client = None
-        print("⚠️  No API key found (HF_TOKEN/API_KEY). Using rule-based fallback agent.")
+        print("⚠️  No HF_TOKEN found. Using rule-based fallback agent.", flush=True)
 
     scores = []
     for task_id in [1, 2, 3, 4]:
