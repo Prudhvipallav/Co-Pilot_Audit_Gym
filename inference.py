@@ -50,22 +50,22 @@ Rules:
 
 def run_inference_episode(task_id: int, client: OpenAI):
     """Run a single episode against the environment."""
-    # 1. Reset
     resp = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id})
     resp.raise_for_status()
     obs = resp.json()["observation"]
-    
-    print(f"\n--- Starting Task {task_id}: {obs['feature_name']} ---")
-    
+    task_name = obs.get("feature_name", f"task_{task_id}")
+
+    print(f"[START] task={task_name}", flush=True)
+
     history = []
     total_reward = 0.0
-    
+    step = 0
+
     for step in range(1, MAX_STEPS + 1):
-        # Build prompt
         inspected = obs.get("inspected_artifacts", [])
         visible = list(obs.get("visible_artifacts", {}).keys())
         flagged = [f['code'] for f in obs.get("flagged_issues", [])]
-        
+
         user_prompt = (
             f"Step {step}/{MAX_STEPS}\n"
             f"Visible Artifacts: {visible}\n"
@@ -75,8 +75,7 @@ def run_inference_episode(task_id: int, client: OpenAI):
             f"Last Message: {obs.get('message', '')[:300]}\n"
             f"What is your next action? Return JSON."
         )
-        
-        # 2. Get LLM Action
+
         try:
             completion = client.chat.completions.create(
                 model=MODEL_NAME,
@@ -88,51 +87,54 @@ def run_inference_episode(task_id: int, client: OpenAI):
                 max_tokens=MAX_TOKENS,
             )
             response_text = completion.choices[0].message.content or ""
-            
-            # Clean JSON
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             action_json = json_match.group() if json_match else response_text
             action_dict = json.loads(action_json)
         except Exception as e:
-            print(f"Error at step {step}: {e}")
+            print(f"[STEP] step={step} reward=0.0 action=error error={e}", flush=True)
             break
 
-        # 3. Step Environment
         resp = requests.post(f"{ENV_URL}/step", json={"action": json.dumps(action_dict)})
         result = resp.json()
-        
+
         obs = result["observation"]
         reward = result["reward"]
         total_reward += reward
-        
-        print(f"Step {step}: {action_dict.get('action_type')} -> Reward: {reward:+.2f}")
-        
+
+        print(f"[STEP] step={step} reward={reward:.4f} action={action_dict.get('action_type','?')}", flush=True)
+
         if result["done"]:
-            print("Episode finished.")
             break
-            
-    # 4. Get Grader Score
+
     grader_resp = requests.get(f"{ENV_URL}/grader")
     score_data = grader_resp.json()
-    print(f"Final Score: {score_data['scores']['overall']:.4f} ({score_data['grade']})")
-    return score_data['scores']['overall']
+    score = score_data['scores']['overall']
+
+    print(f"[END] task={task_name} score={score:.4f} steps={step}", flush=True)
+    return score
 
 def run_rule_based_episode(task_id: int):
     """Fallback: deterministic rule-based agent when no API key available."""
     resp = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id})
     resp.raise_for_status()
     obs = resp.json()["observation"]
-    print(f"\n--- [Rule-Based] Task {task_id}: {obs['feature_name']} ---")
+    task_name = obs.get("feature_name", f"task_{task_id}")
+
+    print(f"[START] task={task_name}", flush=True)
 
     total_reward = 0.0
+    step = 0
 
     # Step 1: Inspect all artifacts
     for art_name in list(obs.get("visible_artifacts", {}).keys()):
+        step += 1
         r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
             "action_type": "inspect_artifact", "target": art_name
         })}).json()
-        total_reward += r["reward"]
+        reward = r["reward"]
+        total_reward += reward
         obs = r["observation"]
+        print(f"[STEP] step={step} reward={reward:.4f} action=inspect_artifact", flush=True)
         if r["done"]:
             break
 
@@ -147,44 +149,57 @@ def run_rule_based_episode(task_id: int):
     for code, sev in known_flags:
         if code.lower().replace("-", "") in msg.replace("-", "").replace("_", "").lower() or \
            code.split("-")[0].lower() in msg:
+            step += 1
             r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
                 "action_type": "flag_issue", "issue_code": code,
                 "severity": sev, "target": "product_spec.md",
                 "note": f"Auto-detected {code}"
             })}).json()
-            total_reward += r["reward"]
+            reward = r["reward"]
+            total_reward += reward
             obs = r["observation"]
+            print(f"[STEP] step={step} reward={reward:.4f} action=flag_issue", flush=True)
             if r["done"]:
                 break
 
-            # Request mitigation
+            step += 1
             r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
                 "action_type": "request_mitigation", "issue_code": code,
                 "note": f"Remediate {code}"
             })}).json()
-            total_reward += r["reward"]
+            reward = r["reward"]
+            total_reward += reward
             obs = r["observation"]
+            print(f"[STEP] step={step} reward={reward:.4f} action=request_mitigation", flush=True)
             if r["done"]:
                 break
 
     # Step 3: Set risk and decide
     if not obs.get("done", False):
+        step += 1
         r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
             "action_type": "set_risk", "severity": "high"
         })}).json()
-        total_reward += r["reward"]
+        reward = r["reward"]
+        total_reward += reward
         obs = r["observation"]
+        print(f"[STEP] step={step} reward={reward:.4f} action=set_risk", flush=True)
 
     if not r.get("done", False):
+        step += 1
         r = requests.post(f"{ENV_URL}/step", json={"action": json.dumps({
             "action_type": "reject"
         })}).json()
-        total_reward += r["reward"]
+        reward = r["reward"]
+        total_reward += reward
+        print(f"[STEP] step={step} reward={reward:.4f} action=reject", flush=True)
 
     grader_resp = requests.get(f"{ENV_URL}/grader")
     score_data = grader_resp.json()
-    print(f"Final Score: {score_data['scores']['overall']:.4f} ({score_data['grade']})")
-    return score_data['scores']['overall']
+    score = score_data['scores']['overall']
+
+    print(f"[END] task={task_name} score={score:.4f} steps={step}", flush=True)
+    return score
 
 
 def main():
